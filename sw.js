@@ -1,42 +1,69 @@
-const CACHE_NAME = "blog-cache-v1";
-const urlsToCache = [
-    "index.html",
-    "styles.css",
-    "offline.html",
-    "icons/icon-192x192.png",
-    "icons/icon-512x512.png"
-];
+const CACHE_NAME = 'pwa-cache-v3';
+const DYNAMIC_CACHE = 'pwa-dynamic-cache';
+const OFFLINE_PAGE = '/offline.html';
 
-self.addEventListener("install", event => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then(cache => {
-            return cache.addAll(urlsToCache);
-        })
-    );
+self.addEventListener('install', (event) => {
+  console.log('[Service Worker] Installing...');
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log('[Service Worker] Pre-caching assets');
+      return cache.addAll([
+        '/',
+        '/index.html',
+        '/about.html',
+        '/offline.html',
+        '/src/css/style.css',
+        '/src/js/app.js',
+        '/manifest.json',
+        '/src/css/offline.css'
+      ]).then(() => {
+        console.log('[Service Worker] All assets cached');
+      }).catch((error) => {
+        console.error('[Service Worker] Failed to cache assets', error);
+      });
+    })
+  );
+  self.skipWaiting();
 });
 
-self.addEventListener("fetch", event => {
-    event.respondWith(
-        fetch(event.request).then(response => {
-            return caches.open(CACHE_NAME).then(cache => {
-                cache.put(event.request, response.clone());
-                return response;
-            });
-        }).catch(() => {
-            return caches.match(event.request).then(response => {
-                return response || caches.match("offline.html");
-            });
+self.addEventListener('activate', (event) => {
+  console.log('[Service Worker] Activating...');
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME && key !== DYNAMIC_CACHE) {
+            console.log('[Service Worker] Deleting old cache:', key);
+            return caches.delete(key);
+          }
         })
-    );
+      );
+    })
+  );
+  return self.clients.claim();
 });
 
-self.addEventListener("activate", event => {
-    event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames.filter(cacheName => cacheName !== CACHE_NAME)
-                .map(cacheName => caches.delete(cacheName))
-            );
-        })
-    );
+self.addEventListener('fetch', function(event) {
+  event.respondWith(
+    caches.match(event.request).then(function(response) {
+      if (response) {
+        return response;
+      }
+      
+      return fetch(event.request).then(function(res) {
+        const resClone = res.clone();
+        
+        caches.open(DYNAMIC_CACHE).then(function(cache) {
+          cache.put(event.request, resClone);
+        });
+        
+        return res;
+      }).catch(function(err) {
+
+        if (event.request.headers.get('accept').includes('text/html')) {
+          return caches.match(OFFLINE_PAGE);
+        }
+      });
+    })
+  );
 });
