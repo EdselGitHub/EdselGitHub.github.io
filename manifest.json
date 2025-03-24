@@ -1,6 +1,6 @@
 {
-  "name": "My Blog PWA",
-  "short_name": "Blog PWA",
+  "name": "my progressive web app",
+  "short_name": "home page",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#ffffff",
